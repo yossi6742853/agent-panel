@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>סוכן אוטונומי - בית התלמוד</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0a0e1a; --card:#131826; --border:#2a3441; --accent:#00d4ff; --good:#4ade80; --warn:#fbbf24; --bad:#f87171; --muted:#6a7a8a; }
+* { box-sizing: border-box; }
+body { font-family: 'Heebo', Arial, sans-serif; background: var(--bg); color: #e0e6ed; margin: 0; padding: 20px; min-height: 100vh; }
+h1 { color: var(--accent); margin-bottom: 5px; font-size: 28px; }
+.subtitle { color: var(--muted); font-size: 13px; margin-bottom: 25px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.card h3 { margin: 0 0 12px 0; color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+.big-num { font-size: 36px; font-weight: 700; color: var(--good); line-height: 1; }
+.label { color: var(--muted); font-size: 12px; margin-top: 6px; }
+.row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 14px; }
+.row .v { color: var(--good); font-weight: 600; }
+.bad { color: var(--bad) !important; }
+.warn { color: var(--warn) !important; }
+.log { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; max-height: 600px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.7; }
+.log .line { padding: 3px 0; border-bottom: 1px solid #1a2330; }
+.queue-item { padding: 10px; background: #1a2330; margin: 6px 0; border-radius: 6px; border-right: 4px solid var(--accent); }
+.queue-item .prio { display: inline-block; background: var(--accent); color: var(--bg); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-left: 10px; }
+.online { color: var(--good); }
+.offline { color: var(--bad); }
+.warning { color: var(--warn); }
+small { color: var(--muted); }
+.status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 6px; vertical-align: middle; }
+.dot-on { background: var(--good); box-shadow: 0 0 8px var(--good); animation: pulse 2s infinite; }
+.dot-off { background: var(--bad); }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+.footer { text-align: center; margin-top: 30px; color: var(--muted); font-size: 12px; }
+.empty { text-align: center; color: var(--muted); padding: 20px; }
+.tag { display: inline-block; background: rgba(0,212,255,0.1); color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 4px; }
+</style>
+</head>
+<body>
+
+<h1>🤖 סוכן אוטונומי - בית התלמוד</h1>
+<div class="subtitle">
+  עדכון אחרון: <span id="last-update">טוען...</span>
+  · <span class="status-dot dot-off" id="hb-dot"></span>
+  <span id="hb-status">בודק...</span>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>סטטוס מערכת</h3>
+    <div id="status-block">טוען...</div>
+  </div>
+  <div class="card">
+    <h3>תור משימות</h3>
+    <div id="backlog-block">טוען...</div>
+  </div>
+  <div class="card">
+    <h3>סריקת מחשב</h3>
+    <div id="scan-block">טוען...</div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>בתור הקרוב</h3>
+    <div id="next-block">טוען...</div>
+  </div>
+  <div class="card" style="grid-column: span 2;">
+    <h3>יומן חי</h3>
+    <div class="log" id="log-block">טוען...</div>
+  </div>
+</div>
+
+<div class="footer">
+  עדכון אוטומטי כל 30 שניות · מקור: GitHub
+</div>
+
+<script>
+async function refresh() {
+  try {
+    const r = await fetch('state.json?t=' + Date.now());
+    const s = await r.json();
+
+    document.getElementById('last-update').textContent =
+      new Date(s.timestamp).toLocaleString('he-IL');
+
+    // dot
+    const hbAge = s.heartbeat_age;
+    const dot = document.getElementById('hb-dot');
+    const hbStatus = document.getElementById('hb-status');
+    if (hbAge === null) {
+      dot.className = 'status-dot dot-off';
+      hbStatus.textContent = 'הסוכן לא רץ';
+      hbStatus.className = 'offline';
+    } else if (hbAge < 120) {
+      dot.className = 'status-dot dot-on';
+      hbStatus.textContent = `פעיל (לפני ${Math.round(hbAge)}s)`;
+      hbStatus.className = 'online';
+    } else {
+      dot.className = 'status-dot dot-off';
+      hbStatus.textContent = `לא פעיל (${Math.round(hbAge)}s)`;
+      hbStatus.className = 'warning';
+    }
+
+    const sys = s.system || {};
+    document.getElementById('status-block').innerHTML = `
+      <div class="row"><span class="label">CPU:</span> <span class="v ${sys.cpu>80?'bad':sys.cpu>50?'warn':''}">${(sys.cpu||0).toFixed(0)}%</span></div>
+      <div class="row"><span class="label">זיכרון:</span> <span class="v">${(sys.memory||0).toFixed(0)}%</span></div>
+      <div class="row"><span class="label">דיסק C:</span> <span class="v">${(sys.disk_c||0).toFixed(0)}%</span></div>
+    `;
+
+    const bl = s.backlog;
+    document.getElementById('backlog-block').innerHTML = `
+      <div class="big-num">${bl.pending}</div>
+      <div class="label">ממתינות בתור</div>
+      <div class="row"><span class="label">בעבודה:</span> <span class="v warn">${bl.in_progress}</span></div>
+      <div class="row"><span class="label">הושלמו:</span> <span class="v online">${bl.done}</span></div>
+      <div class="row"><span class="label">נכשלו:</span> <span class="v bad">${bl.failed || 0}</span></div>
+    `;
+
+    const sc = s.scan || {};
+    document.getElementById('scan-block').innerHTML = `
+      <div class="big-num">${(sc.files || 0).toLocaleString('he-IL')}</div>
+      <div class="label">קבצים זוהו</div>
+      <div class="row"><span class="label">פרויקטים:</span> <span class="v">${sc.projects || 0}</span></div>
+      <div class="row"><span class="label">נסרק:</span> <small>${sc.last_dir ? '...' + sc.last_dir.slice(-40) : '?'}</small></div>
+    `;
+
+    const next = bl.next || [];
+    document.getElementById('next-block').innerHTML = next.length === 0 ?
+      '<div class="empty">אין משימות בתור 🎉</div>' :
+      next.map(t => `<div class="queue-item"><span class="prio">P${t.priority}</span>${t.title}</div>`).join('');
+
+    const log = s.recent_log || [];
+    document.getElementById('log-block').innerHTML =
+      log.slice().reverse().slice(0, 100).map(l => `<div class="line">${l}</div>`).join('') ||
+      '<div class="empty">אין רישומים</div>';
+  } catch (e) {
+    console.error(e);
+    document.getElementById('last-update').textContent = 'שגיאה';
+  }
+}
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>
