@@ -35,6 +35,19 @@ small { color: var(--muted); }
 .footer { text-align: center; margin-top: 30px; color: var(--muted); font-size: 12px; }
 .empty { text-align: center; color: var(--muted); padding: 20px; }
 .tag { display: inline-block; background: rgba(0,212,255,0.1); color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 4px; }
+.done-item { padding: 10px; background: #1a2330; margin: 6px 0; border-radius: 6px; border-right: 4px solid var(--good); }
+.done-item .title { font-weight: 600; color: #e0e6ed; font-size: 13px; }
+.done-item .summary { color: var(--muted); font-size: 11px; margin-top: 4px; line-height: 1.5; }
+.done-item .meta { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.done-item .partial-badge { display: inline-block; background: rgba(251,191,36,0.15); color: var(--warn); padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-right: 6px; }
+.done-item .done-badge { display: inline-block; background: rgba(74,222,128,0.15); color: var(--good); padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-right: 6px; }
+.chat-msg { padding: 8px 10px; background: #1a2330; margin: 6px 0; border-radius: 6px; border-right: 3px solid var(--muted); }
+.chat-msg.q { border-right-color: var(--warn); }
+.chat-msg.a { border-right-color: var(--accent); }
+.chat-msg.i { border-right-color: #a78bfa; }
+.chat-msg .who { font-size: 11px; color: var(--accent); font-weight: 600; }
+.chat-msg .ts { font-size: 10px; color: var(--muted); margin-right: 6px; }
+.chat-msg .body { color: #e0e6ed; font-size: 12px; margin-top: 4px; line-height: 1.5; white-space: pre-wrap; max-height: 80px; overflow: hidden; }
 </style>
 </head>
 <body>
@@ -67,6 +80,17 @@ small { color: var(--muted); }
     <div id="next-block">טוען...</div>
   </div>
   <div class="card" style="grid-column: span 2;">
+    <h3>מה עשיתי לאחרונה</h3>
+    <div id="done-block">טוען...</div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card" style="grid-column: span 2;">
+    <h3>התייעצויות צוות (claude-main · voice · claw)</h3>
+    <div id="chat-block">טוען...</div>
+  </div>
+  <div class="card">
     <h3>יומן חי</h3>
     <div class="log" id="log-block">טוען...</div>
   </div>
@@ -132,9 +156,41 @@ async function refresh() {
       '<div class="empty">אין משימות בתור 🎉</div>' :
       next.map(t => `<div class="queue-item"><span class="prio">P${t.priority}</span>${t.title}</div>`).join('');
 
+    // done
+    const esc = (str) => String(str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmtTs = (ts) => {
+      if (!ts) return '';
+      try { return new Date(ts).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+      catch { return ts; }
+    };
+    const done = s.done_tasks || [];
+    document.getElementById('done-block').innerHTML = done.length === 0 ?
+      '<div class="empty">עדיין כלום</div>' :
+      done.map(t => `
+        <div class="done-item">
+          <div class="title"><span class="${t.status === 'done' ? 'done-badge' : 'partial-badge'}">${t.status === 'done' ? '✅ הושלם' : '⏳ חלקית'}</span><span class="prio">P${esc(t.priority)}</span> ${esc(t.title)}</div>
+          <div class="summary">${esc(t.summary)}</div>
+          <div class="meta">${fmtTs(t.updated)}</div>
+        </div>`).join('');
+
+    // team chat
+    const chat = s.team_chat || [];
+    const typeMap = {question:'q', answer:'a', insight:'i', update:''};
+    const labelMap = {question:'שאלה', answer:'תשובה', insight:'תובנה', update:'עדכון'};
+    document.getElementById('chat-block').innerHTML = chat.length === 0 ?
+      '<div class="empty">אין התייעצויות אחרונות</div>' :
+      chat.slice().reverse().map(m => `
+        <div class="chat-msg ${typeMap[m.type] || ''}">
+          <span class="who">${esc(m.author)}</span>
+          <span class="ts">${fmtTs(m.ts)} · ${labelMap[m.type] || m.type}</span>
+          <div class="body">${esc(m.content)}</div>
+        </div>`).join('');
+
     const log = s.recent_log || [];
+    // סנן רעש "CPU גבוה (XX%) — ממתין"
+    const filtered = log.filter(l => !/CPU גבוה .* — ממתין/.test(l) && !/`target`=\d+/.test(l));
     document.getElementById('log-block').innerHTML =
-      log.slice().reverse().slice(0, 100).map(l => `<div class="line">${l}</div>`).join('') ||
+      filtered.slice().reverse().slice(0, 80).map(l => `<div class="line">${esc(l)}</div>`).join('') ||
       '<div class="empty">אין רישומים</div>';
   } catch (e) {
     console.error(e);
