@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-06-19T10:00:00",
+  "agent": {"version": "1.0", "status": "initializing"},
+  "recent_log": ["**10:00** 🎯 פאנל GitHub עלה לאוויר"],
+  "backlog": {"pending": 19, "in_progress": 1, "done": 0, "failed": 0, "next": []},
+  "heartbeat_age": 0,
+  "scan": {"files": 67000, "projects": 66, "last_dir": "מתעדכן..."},
+  "system": {"cpu": 50, "memory": 50, "disk_c": 50}
+}
